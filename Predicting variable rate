@@ -1,0 +1,156 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import CallingData as cd
+from sklearn.linear_model import Ridge
+from sklearn.metrics import mean_absolute_error
+
+# We first need to see if the data has any NaN
+null_pct = cd.mortgages.apply(pd.isnull).sum() / cd.mortgages.shape[0]
+# print(null_pct)
+
+# 3 cols have NaN values, so we want the ones with less than 5% NaN
+# Lucky for us, these cols have 0% no missing values
+valid_columns = cd.mortgages.columns[null_pct < 0.5]
+# print(valid_columns)
+
+cd.mortgages = cd.mortgages[valid_columns].copy()
+cd.mortgages.columns = cd.mortgages.columns.str.lower()
+# print(cd.mortgages)
+
+# Checking if our data is the right type to predict with
+# print(cd.mortgages.dtypes)
+
+# Our index is an option as we can see
+# print(cd.mortgages.index)
+
+cd.mortgages.index = pd.to_datetime(cd.mortgages.index)
+# print(cd.mortgages.index)
+# Now it's a datetime
+
+
+# Checking to see there's no gaps in data
+# print(cd.mortgages.index.value_counts().sort_index())
+
+# cd.mortgages['variable rate'].plot()
+# plt.title('Variable Interest Rate Over Time')
+# plt.xlabel('Index')
+# plt.ylabel('Variable Rate')
+# plt.show()
+
+# We know the variable rate of any given month, we know the banks interest rates,
+# and we know the yield over 10 years of a govt bond
+# We want to predict what the variable rates
+
+cd.mortgages['target'] = cd.mortgages.shift(-1)['variable rate']
+# print(cd.mortgages['target'])
+# Note the last value is NaN, so we don't have for 1/10/2023
+
+
+cd.mortgages = cd.mortgages.ffill()
+# print(cd.mortgages['target'])
+# We have filled it with last month's data, although not accurate since
+# we have about 300 data points it shouldn't matter too much
+
+rr = Ridge(alpha=.1)
+
+predictors = cd.mortgages.columns[~cd.mortgages.columns.isin(
+    ['target', 'fixed_rate_2y_95%_ltv', 'fixed_rate_2y_75%_ltv', 'fixed_rate_3y_75%_ltv', 'tracker', 'libor_3m'])]
+
+
+# print(predictors)
+
+def backtest(weather, model, predictors, start=120, step=6):
+    all_predictions = []
+    for i in range(start, cd.mortgages.shape[0], step):
+        train = cd.mortgages.iloc[:i, :]
+        test = cd.mortgages.iloc[i:(i + step), :]
+
+        model.fit(train[predictors], train['target'])
+
+        preds = model.predict(test[predictors])
+
+        preds = pd.Series(preds, index=test.index)
+        combined = pd.concat([test['target'], preds], axis=1)
+
+        combined.columns = ['actual', 'prediction']
+
+        combined['diff'] = (combined['prediction'] - combined['actual']).abs()
+
+        all_predictions.append(combined)
+    return pd.concat(all_predictions, axis=0)
+
+
+preditions = backtest(cd.mortgages, rr, predictors)
+
+# print(preditions)
+
+# Want to see how accurate our predictions were
+print(mean_absolute_error(preditions['actual'], preditions['prediction']))
+
+
+# note this is just the same as taking the mean of the diff col of predictions
+
+# We were 0.0067982... off on average
+# To improve we do this
+
+def pct_diff(old, new):
+    return (new - old) / old
+
+
+# Want rolling averages
+def compute_rolling(mortgage, horizon, col):
+    label = f'rolling_{horizon}_{col}'
+
+    mortgage[label] = mortgage[col].rolling(horizon).mean()
+
+    mortgage[f'{label}_pct'] = pct_diff(mortgage[label], mortgage[col])
+    return mortgage
+
+
+rolling_horizons = [3, 14]
+
+for horizon in rolling_horizons:
+    for col in ['variable rate', 'bank_rate', 'gov_bond_yield_10y']:
+        cd.mortgages = compute_rolling(cd.mortgages, horizon, col)
+# print(cd.mortgages)
+# Note we have 14 months of missing data now which we should remove
+
+
+cd.mortgages = cd.mortgages.iloc[14:, :]
+
+# Want to see our entire dataframe
+pd.set_option('display.max_columns', None)
+# print(cd.mortgages)
+
+# Does not appear to be any NaN but just to be sure
+cd.mortgages = cd.mortgages.fillna(0)
+
+
+# print(cd.mortgages)
+
+def expand_mean(df):
+    return df.expanding(1).mean()
+
+
+for col in ['variable rate', 'bank_rate', 'gov_bond_yield_10y']:
+    cd.mortgages[f'yearly_avg_{col}'] = (cd.mortgages[col].groupby(cd.mortgages.index.year, group_keys=False).
+                                         apply(expand_mean))
+    cd.mortgages[f'monthly_avg_{col}'] = (cd.mortgages[col].groupby(cd.mortgages.index.month, group_keys=False).
+                                          apply(expand_mean))
+
+# print(cd.mortgages)
+# Now we have all our predictors use same code as before...
+predictors = cd.mortgages.columns[~cd.mortgages.columns.isin(
+    ['target', 'fixed_rate_2y_95%_ltv', 'fixed_rate_2y_75%_ltv', 'fixed_rate_3y_75%_ltv', 'tracker', 'libor_3m'])]
+
+predictions = backtest(cd.mortgages, rr, predictors)
+# print(predictions['diff'].mean())
+
+# We have roughly halved the error! (last time 0.00679828, this time 0.00303464)
+
+# Which months were our worst predictions?
+# print(predictions.sort_values('diff', ascending=False))
+# it was 1/8/2010
+# Looking back at the data for this date shows a large anomalous drop in Govt bond yield
+# Which likely caused this
