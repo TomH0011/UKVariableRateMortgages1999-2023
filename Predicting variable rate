@@ -83,10 +83,14 @@ def backtest(weather, model, predictors, start=120, step=6):
 
 preditions = backtest(cd.mortgages, rr, predictors)
 
-# print(preditions)
+print('Here is our first set of predictions')
+print(preditions)
+print('--------------------------------------------------------')
 
 # Want to see how accurate our predictions were
-print(mean_absolute_error(preditions['actual'], preditions['prediction']))
+print(f'We can see through our Mean Absolute value {mean_absolute_error(preditions['actual'], preditions['prediction'])} that we could do better!')
+# print(mean_absolute_error(preditions['actual'], preditions['prediction']))
+print('--------------------------------------------------------')
 
 
 # note this is just the same as taking the mean of the diff col of predictions
@@ -145,12 +149,15 @@ predictors = cd.mortgages.columns[~cd.mortgages.columns.isin(
     ['target', 'fixed_rate_2y_95%_ltv', 'fixed_rate_2y_75%_ltv', 'fixed_rate_3y_75%_ltv', 'tracker', 'libor_3m'])]
 
 predictions = backtest(cd.mortgages, rr, predictors)
-# print(predictions['diff'].mean())
-
-# We have roughly halved the error! (last time 0.00679828, this time 0.00303464)
+print('So our Final predictions after improving our predictors are:')
+print(predictions)
+print('--------------------------------------------------------')
+print(f'Our new Mean absolute error: {predictions['diff'].mean()}')
+print('--------------------------------------------------------')
+# We have roughly halved the error! (last time 0.00679828, this time 0.00303464) line 89
 
 # Which months were our worst predictions?
-# print(predictions.sort_values('diff', ascending=False))
-# it was 1/8/2010
-# Looking back at the data for this date shows a large anomalous drop in Govt bond yield
-# Which likely caused this
+print('If we sort our diff column in a descending order we can view our worst predictions')
+print(predictions.sort_values('diff', ascending=False))
+print('it was 1/8/2010; Looking back through the data for this date shows a large anomalous drop in Govt bond yield '
+      'Which likely caused this')
