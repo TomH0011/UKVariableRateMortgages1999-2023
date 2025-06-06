@@ -1,16 +1,27 @@
-To be ablke to run this you must download the data from kaggle
+# 🏡 UK Mortgage Rate Prediction
 
-https://www.kaggle.com/datasets/liamhealy/uk-mortgage-rates
+This project aims to predict the **UK variable mortgage interest rate** using historic data, including:
+- Past variable interest rates
+- Bank of England interest rates
+- 10-year government bond yields
 
-Save it to files
-Unzip it
-Copy the file path to the correect line in the CallingData module
+We use this financial time-series data to train a regression model and evaluate its accuracy over time.
 
-Run main
+---
 
+## 📥 Getting Started
 
-The goal of this code was to predict Variable interest rate for UK housing mortgages using historic data on variable interest rates, 
-the yields of ten year long government bonds and the bank of englands interest rates.
-With a datetime index I calculate the rolling averages and yearly and monthly averages to make better predictors of the variable interest rates
-and at the end I show I got it close!
-I also point out outliers and where they may have arisen by doing analysis on the differences between my prediction and and the actual interest rate
+1. **Download the dataset** from Kaggle:
+   [UK Mortgage Rates – Liam Healy](https://www.kaggle.com/datasets/liamhealy/uk-mortgage-rates)
+
+2. **Unzip the downloaded file**.
+
+3. **Update the file path** in `CallingData.py`:
+   ```python
+   file_path = 'ENTER YOUR FILE PATH TO CSV HERE'
+
+4. **Run the main script**
+    python main.py
+
+**Install Dependencies**
+pip install -r requirements.txt
